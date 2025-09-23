@@ -80,5 +80,9 @@ public abstract class BaseEntity {
         return Objects.hash(getId());
     }
 
+    /**
+     * Abstract method to get the entity ID
+     * Must be implemented by all concrete entities
+     */
     public abstract String getId();
 }

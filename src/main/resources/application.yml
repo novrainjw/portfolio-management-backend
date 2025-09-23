@@ -1,0 +1,179 @@
+# Main application configuration
+spring:
+  application:
+    name: Portfolio Management Backend
+  
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # JPA/Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate # Use 'validate' since we have manual schema
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+    show-sql: false
+    open-in-view: false
+
+  # Data Source Configuration (will be overridden by profiles)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/portfolio_db
+    username: ${DB_USERNAME:portfolio_user}
+    password: ${DB_PASSWORD:portfolio_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      connection-timeout: 20000
+      pool-name: PortfolioHikariPool
+      leak-detection-threshold: 60000
+
+  # Security Configuration
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET:your-very-secure-secret-key-that-is-at-least-256-bits-long}
+      access-token-expiration: 86400000 # 24 hours in milliseconds
+      refresh-token-expiration: 604800000 # 7 days in milliseconds
+
+  # Jackson Configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  # Cache Configuration
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterAccess=600s
+
+  # Actuator Configuration
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,metrics,prometheus,env
+        base-path: /actuator
+    endpoint:
+      health:
+        show-details: when_authorized
+    health:
+      circuitbreakers:
+        enabled: true
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: never
+    include-exception: false
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.portfolio.management: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      portfolioService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        recordExceptions:
+          - java.lang.Exception
+
+  retry:
+    instances:
+      portfolioService:
+        maxAttempts: 3
+        waitDuration: 1000ms
+        retryExceptions:
+          - java.lang.Exception
+
+  ratelimiter:
+    instances:
+      portfolioService:
+        limitRefreshPeriod: 1s
+        limitForPeriod: 100
+        timeoutDuration: 3s
+
+  bulkhead:
+    instances:
+      portfolioService:
+        maxConcurrentCalls: 25
+        maxWaitDuration: 20ms
+
+# API Documentation Configuration
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  show-actuator: true
+
+# Application Specific Configuration
+app:
+  portfolio:
+    default-currency: USD
+    max-portfolios-per-user: 10
+    max-holdings-per-portfolio: 100
+    price-update-interval: 15 # minutes
+  
+  security:
+    cors:
+      allowed-origins:
+        - http://localhost:4200
+        - https://your-frontend-domain.com
+      allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+      allowed-headers: "*"
+      allow-credentials: true
+      max-age: 3600
+
+  rate-limiting:
+    enabled: true
+    requests-per-minute: 100
+
+  audit:
+    enabled: true
