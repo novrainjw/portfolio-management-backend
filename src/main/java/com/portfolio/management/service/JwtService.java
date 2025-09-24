@@ -1,111 +1,237 @@
 package com.portfolio.management.service;
 
+import com.portfolio.management.security.UserPrincipal;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+
+import javax.crypto.SecretKey;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.security.Key;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * JWT Service for token generation and validation
  */
 @Service
 public class JwtService {
-
     private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
 
-    @Value("${spring.security.jwt.secret-key}")
-    private String secretKey;
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
 
-    @Value("${spring.security.jwt.access-token-expiration}")
-    private long accessTokenExpiration;
+    @Value("${app.jwt.expiration}")
+    private int jwtExpirationInMs;
 
-    @Value("${spring.security.jwt.refresh-token-expiration}")
-    private long refreshTokenExpiration;
+    @Value("${app.jwt.refresh-expiration}")
+    private int jwtRefreshExpirationInMs;
 
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+    /**
+     * Generate JWT token from authentication
+     */
+    public String generateToken(Authentication authentication) {
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return generateTokenFromUsername(userPrincipal.getUsername());
     }
 
-    public String generateAccessToken(Authentication authentication) {
-        UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
-        return generateAccessToken(userPrincipal.getUsername());
-    }
-
-    public String generateAccessToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        return generateToken(claims, username, accessTokenExpiration);
-    }
-
-    public String generateRefreshToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("type", "refresh");
-        return generateToken(claims, username, refreshTokenExpiration);
-    }
-
-    private String generateToken(Map<String, Object> claims, String subject, long expiration) {
-        Instant now = Instant.now();
-        Instant expirationTime = now.plus(expiration, ChronoUnit.MILLIS);
+    /**
+     * Generate JWT token from username
+     */
+    public String generateTokenFromUsername(String username) {
+        Date expiryDate = new Date(System.currentTimeMillis() + jwtExpirationInMs);
 
         return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(expirationTime))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(expiryDate)
+                .signWith(getSignInKey(), Jwts.SIG.HS512)
                 .compact();
     }
 
+    /**
+     * Generate refresh token
+     */
+    public String generateRefreshToken(String username) {
+        Date expiryDate = new Date(System.currentTimeMillis() + jwtRefreshExpirationInMs);
+
+        return Jwts.builder()
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(expiryDate)
+                .claim("type", "refresh")
+                .signWith(getSignInKey(), Jwts.SIG.HS512)
+                .compact();
+    }
+
+    /**
+     * Extract username from JWT token
+     */
     public String getUsernameFromToken(String token) {
-        Claims claims = getClaimsFromToken(token);
+        Claims claims = Jwts.parser()
+                .verifyWith(getSignInKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
         return claims.getSubject();
     }
 
-    public Date getExpirationDateFromToken(String token) {
-        Claims claims = getClaimsFromToken(token);
+    /**
+     * Extract expiration date from JWT token
+     */
+    public Date getExpirationFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSignInKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
         return claims.getExpiration();
     }
 
-    public boolean isTokenExpired(String token) {
-        Date expiration = getExpirationDateFromToken(token);
-        return expiration.before(new Date());
-    }
-
-    public boolean validateToken(String token) {
+    /**
+     * Validate JWT token
+     */
+    public boolean validateToken(String authToken) {
         try {
-            getClaimsFromToken(token);
-            return !isTokenExpired(token);
-        } catch (MalformedJwtException e) {
-            logger.error("Invalid JWT token: {}", e.getMessage());
-        } catch (ExpiredJwtException e) {
-            logger.error("JWT token is expired: {}", e.getMessage());
-        } catch (UnsupportedJwtException e) {
-            logger.error("JWT token is unsupported: {}", e.getMessage());
-        } catch (IllegalArgumentException e) {
-            logger.error("JWT claims string is empty: {}", e.getMessage());
-        } catch (Exception e) {
-            logger.error("JWT token validation failed: {}", e.getMessage());
+            Jwts.parser()
+                    .verifyWith(getSignInKey())
+                    .build()
+                    .parseSignedClaims(authToken);
+            return true;
+        } catch (MalformedJwtException ex) {
+            logger.error("Invalid JWT token: {}", ex.getMessage());
+        } catch (ExpiredJwtException ex) {
+            logger.error("Expired JWT token: {}", ex.getMessage());
+        } catch (UnsupportedJwtException ex) {
+            logger.error("Unsupported JWT token: {}", ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            logger.error("JWT claims string is empty: {}", ex.getMessage());
+        } catch (JwtException ex) {
+            logger.error("JWT validation failed: {}", ex.getMessage());
         }
         return false;
     }
 
-    private Claims getClaimsFromToken(String token) {
+    /**
+     * Check if token is expired
+     */
+    public boolean isTokenExpired(String token) {
+        try {
+            Date expiration = getExpirationFromToken(token);
+            return expiration.before(new Date());
+        } catch (Exception e) {
+            logger.error("Error checking token expiration: {}", e.getMessage());
+            return true;
+        }
+    }
+
+    /**
+     * Check if token is refresh token
+     */
+    public boolean isRefreshToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSignInKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            String tokenType = claims.get("type", String.class);
+            return "refresh".equals(tokenType);
+        } catch (Exception e) {
+            logger.error("Error checking token type: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get token remaining validity in milliseconds
+     */
+    public long getTokenRemainingValidity(String token) {
+        try {
+            Date expiration = getExpirationFromToken(token);
+            return expiration.getTime() - System.currentTimeMillis();
+        } catch (Exception e) {
+            logger.error("Error getting token remaining validity: {}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Refresh access token using refresh token
+     */
+    public String refreshAccessToken(String refreshToken) {
+        if (!validateToken(refreshToken) || !isRefreshToken(refreshToken)) {
+            throw new IllegalArgumentException("Invalid refresh token");
+        }
+
+        String username = getUsernameFromToken(refreshToken);
+        return generateTokenFromUsername(username);
+    }
+
+    /**
+     * Extract all claims from token
+     */
+    public Claims getAllClaimsFromToken(String token) {
         return Jwts.parser()
-                .setSigningKey(getSigningKey())
+                .verifyWith(getSignInKey())
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    /**
+     * Get signing key from secret
+     */
+    private SecretKey getSignInKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * Create token with custom claims
+     */
+    public String createTokenWithClaims(String username, long expirationTime, Claims extraClaims) {
+        Date expiryDate = new Date(System.currentTimeMillis() + expirationTime);
+
+        JwtBuilder builder = Jwts.builder()
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(expiryDate);
+
+        if (extraClaims != null) {
+            builder.claims(extraClaims);
+            builder.subject(username); // Ensure subject is not overwritten
+        }
+
+        return builder.signWith(getSignInKey(), Jwts.SIG.HS512).compact();
+    }
+
+    /**
+     * Get token type (access or refresh)
+     */
+    public String getTokenType(String token) {
+        try {
+            Claims claims = getAllClaimsFromToken(token);
+            return claims.get("type", String.class);
+        } catch (Exception e) {
+            logger.error("Error getting token type: {}", e.getMessage());
+            return "access"; // Default to access token
+        }
+    }
+
+    /**
+     * Check if token will expire soon (within next 5 minutes)
+     */
+    public boolean isTokenExpiringSoon(String token) {
+        long remainingTime = getTokenRemainingValidity(token);
+        return remainingTime > 0 && remainingTime < 300000; // 5 minutes in milliseconds
     }
 }

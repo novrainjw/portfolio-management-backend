@@ -1,26 +1,33 @@
-# Production Profile
 spring:
   config:
     activate:
       on-profile: prod
 
   datasource:
-    url: ${DATABASE_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 50
+      minimum-idle: 10
 
   jpa:
     show-sql: false
     properties:
       hibernate:
         format_sql: false
+        use_sql_comments: false
 
 logging:
   level:
+    com.portfolio.management: WARN
     root: WARN
-    com.portfolio.management: INFO
   file:
-    name: logs/portfolio-management.log
+    name: /var/log/portfolio-management/application.log
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+server:
+  compression:
+    enabled: true

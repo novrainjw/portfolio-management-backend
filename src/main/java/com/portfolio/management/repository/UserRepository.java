@@ -1,6 +1,7 @@
 package com.portfolio.management.repository;
 
 import com.portfolio.management.entity.User;
+import com.portfolio.management.repository.custom.UserRepositoryCustom;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -13,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
+public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User>, UserRepositoryCustom {
     // Find by unique fields
     Optional<User> findByUsername(String username);
 
@@ -71,4 +72,12 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
     // Batch operations
     @Query("UPDATE User u SET u.isActive = false WHERE u.lastLoginAt < :cutoffDate")
     int deactivateInactiveUsers(@Param("cutoffDate") Instant cutoffDate);
+
+    @Query("SELECT u FROM User u WHERE " +
+            "LOWER(u.username) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(u.firstName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(u.lastName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
+    List<User> searchUsers(@Param("searchTerm") String searchTerm);
 }

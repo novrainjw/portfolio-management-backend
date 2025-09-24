@@ -1,21 +1,25 @@
-# Development Profile
 spring:
   config:
     activate:
       on-profile: dev
-
+  
   datasource:
-    url: jdbc:postgresql://localhost:5432/portfolio_db
-    username: portfolio_user
-    password: portfolio_pass
-
+    url: jdbc:postgresql://localhost:5432/portfolio_management_dev
+  
   jpa:
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+        use_sql_comments: true
 
 logging:
   level:
     com.portfolio.management: DEBUG
-    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+app:
+  jwt:
+    expiration: 3600000 # 1 hour for development

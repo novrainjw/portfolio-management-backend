@@ -26,7 +26,7 @@
         <!-- Dependency Versions -->
         <mapstruct.version>1.6.2</mapstruct.version>
         <resilience4j.version>2.2.0</resilience4j.version>
-        <jjwt.version>0.12.6</jjwt.version>
+        <jjwt.version>0.12.3</jjwt.version>
         <springdoc.version>2.6.0</springdoc.version>
         <testcontainers.version>1.21.3</testcontainers.version>
 

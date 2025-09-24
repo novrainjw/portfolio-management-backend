@@ -1,4 +1,3 @@
-# Test Profile
 spring:
   config:
     activate:
@@ -9,18 +8,17 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
-
+  
   jpa:
     hibernate:
       ddl-auto: create-drop
     database-platform: org.hibernate.dialect.H2Dialect
-    show-sql: false
-
+  
   h2:
     console:
       enabled: true
 
-logging:
-  level:
-    org.springframework.test: DEBUG
-    org.testcontainers: DEBUG
+app:
+  jwt:
+    secret: dGVzdFNlY3JldEtleUZvckpXVFRva2VuR2VuZXJhdGlvbkFuZFZhbGlkYXRpb25QdXJwb3Nlcw==
+    expiration: 3600000 # 1 hour for testing
