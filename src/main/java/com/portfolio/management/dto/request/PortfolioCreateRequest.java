@@ -1,0 +1,61 @@
+package com.portfolio.management.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public class PortfolioCreateRequest {
+    @NotBlank(message = "Portfolio name is required")
+    @Size(min = 2, max = 100, message = "Portfolio name must be between 2 and 100 characters")
+    private String name;
+
+    @Size(max = 500, message = "Description cannot exceed 500 characters")
+    private String description;
+
+    @Size(min = 3, max = 3, message = "Currency code must be 3 characters")
+    private String currency = "USD";
+
+    private boolean isPublic = false;
+
+    // Constructors
+    public PortfolioCreateRequest() {
+    }
+
+    public PortfolioCreateRequest(String name, String description, String currency) {
+        this.name = name;
+        this.description = description;
+        this.currency = currency;
+    }
+
+    // Getters and setters
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public boolean isPublic() {
+        return isPublic;
+    }
+
+    public void setPublic(boolean isPublic) {
+        this.isPublic = isPublic;
+    }
+}
